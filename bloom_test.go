@@ -1,8 +1,8 @@
 package bloom
 
 import (
+	"sync"
 	"testing"
-  "sync"
 )
 
 type Sample struct {
@@ -45,37 +45,37 @@ func TestInsertInt64(t *testing.T) {
 }
 
 func TestConcurrentAdd(t *testing.T) {
-  bf := NewBloomFilter()
-  var wg sync.WaitGroup
-  addCount := 100
-  wg.Add(1)
-  go func() {
-    for i := 0; i < addCount; i ++ {
-      bf.Insert(int64(i))
-    }
-    wg.Done()
-    wg.Wait()
+	bf := NewBloomFilter()
+	var wg sync.WaitGroup
+	addCount := 100
+	wg.Add(1)
+	go func() {
+		for i := 0; i < addCount; i++ {
+			bf.Insert(int64(i))
+		}
+		wg.Done()
+		wg.Wait()
 
-    for i := 0; i < addCount; i ++ {
-      if has, err := bf.PossiblyContains(int64(i)); !has || err != nil {
-        t.Error(err)
-      }
-    }
-  }()
+		for i := 0; i < addCount; i++ {
+			if has, err := bf.PossiblyContains(int64(i)); !has || err != nil {
+				t.Error(err)
+			}
+		}
+	}()
 
-  wg.Add(1)
-  go func() {
-    for i := 0; i < addCount; i ++ {
-      bf.Insert(float64(i))
-    }
-    wg.Done()
-    wg.Wait()
-    for i := 0; i < addCount; i ++ {
-      if has, err := bf.PossiblyContains(float64(i)); !has || err != nil {
-        t.Error(err)
-      }
-    }
-  }()
+	wg.Add(1)
+	go func() {
+		for i := 0; i < addCount; i++ {
+			bf.Insert(float64(i))
+		}
+		wg.Done()
+		wg.Wait()
+		for i := 0; i < addCount; i++ {
+			if has, err := bf.PossiblyContains(float64(i)); !has || err != nil {
+				t.Error(err)
+			}
+		}
+	}()
 
-  wg.Wait()
+	wg.Wait()
 }

@@ -8,21 +8,22 @@ import (
 )
 
 type bloomFilter struct {
-	bitfields      map[int][]byte
-	bitfieldCounts sync.Map
-	totalCount     *uint32
+	bitfields     map[int][]byte
+	bitfieldLocks sync.Map // map[int]*sync.RWMutex
+	totalCount    *uint32
 }
 
 type BloomFilter interface {
 	Insert(interface{}) error
 	PossiblyContains(interface{}) (bool, error)
+	Len() uint32
 }
 
 func NewBloomFilter() BloomFilter {
 	return &bloomFilter{
-		bitfields:      make(map[int][]byte),
-		bitfieldCounts: sync.Map{},
-		totalCount:     new(uint32),
+		bitfields:     make(map[int][]byte),
+		bitfieldLocks: sync.Map{},
+		totalCount:    new(uint32),
 	}
 }
 
@@ -41,24 +42,25 @@ func (b *bloomFilter) Insert(v interface{}) error {
 
 	parts := buf.Bytes()
 
-	swapped := false
-	actual, _ := b.bitfieldCounts.LoadOrStore(size, new(uint32))
-	countPointer := actual.(*uint32)
-	for !swapped {
-		count := atomic.LoadUint32(countPointer)
-		bitfield, has := b.bitfields[size]
-		if !has {
-			bitfield = make([]byte, size)
-		}
-
-		for i, v := range bitfield {
-			bitfield[i] = v | parts[i]
-		}
-
-		b.bitfields[size] = bitfield
-		swapped = atomic.CompareAndSwapUint32(countPointer, count, count+1)
+	val, has := b.bitfieldLocks.Load(size)
+	if !has {
+		val, _ = b.bitfieldLocks.LoadOrStore(size, &sync.RWMutex{})
 	}
-	b.bitfieldCounts.Store(size, countPointer)
+	mutex := val.(*sync.RWMutex)
+	mutex.Lock()
+
+	bitfield, has := b.bitfields[size]
+	if !has {
+		bitfield = make([]byte, size)
+		b.bitfields[size] = bitfield
+	}
+
+	for i := range bitfield {
+		bitfield[i] |= parts[i]
+	}
+
+	b.bitfields[size] = bitfield
+	mutex.Unlock()
 
 	bufferPool.Put(buf)
 	return nil
