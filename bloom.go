@@ -73,13 +73,23 @@ func (b *bloomFilter) PossiblyContains(v interface{}) (bool, error) {
 	if err := binary.Write(buf, binary.LittleEndian, v); err != nil {
 		return false, err
 	}
-
 	size := buf.Len()
+	parts := buf.Bytes()
+
+	val, has := b.bitfieldLocks.Load(size)
+	if !has {
+		return false, nil
+	}
+	mutex := val.(*sync.RWMutex)
+
+	mutex.RLock()
+	defer mutex.RUnlock()
+
 	bitfield, has := b.bitfields[size]
 	if !has {
 		return false, nil
 	}
-	parts := buf.Bytes()
+
 	for i, v := range bitfield {
 		if v&parts[i] != parts[i] {
 			return false, nil

@@ -79,3 +79,30 @@ func TestConcurrentAdd(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestConcurrentInsertContains(t *testing.T) {
+	bf := NewBloomFilter()
+	var wg sync.WaitGroup
+	addCount := 100
+	wg.Add(1)
+	go func() {
+		for i := 0; i < addCount; i++ {
+			if err := bf.Insert(int64(i)); err != nil {
+				t.Error(err)
+			}
+		}
+		wg.Done()
+	}()
+
+	wg.Add(1)
+	go func() {
+		for i := 0; i < addCount; i++ {
+			if _, err := bf.PossiblyContains(int64(i)); err != nil {
+				t.Error(err)
+			}
+		}
+		wg.Done()
+	}()
+
+	wg.Wait()
+}
