@@ -1,14 +1,12 @@
 package bloom
 
 import (
-  "sync"
-  "bytes"
+	"bytes"
+	"sync"
 )
 
 var bufferPool sync.Pool = sync.Pool{
-  New: func() interface{} {
-    return new(bytes.Buffer)
-  },
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
 }
-
-
